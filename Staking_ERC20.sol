@@ -1,80 +1,69 @@
+//https://www.youtube.com/watch?v=1IDqOXRF-Ls
+//https://www.youtube.com/watch?v=lQtf6mI1D70&t=160s
+
 // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
-pragma solidity ^0.8.26;
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract Staking_ERC20 {
+contract MyToken is ERC20 {
 
-    struct Staker {
-        uint amount;
-        uint staked_timestamp;
+  struct Staker {
+        uint stakedTokens;
+        uint lastStakeMovement;
     }
 
     mapping(address => Staker) public balances;
-    uint public APR_bp;
+    uint public basisPoints;
 
-    event Stake(address _staker, uint _amount);
-    event Withdraw(address _staker, uint stake_amount);
+    event Stake(address _staker, uint _stakedTokens);
+    event Unstake(address _staker, uint _unstakedTokens);
 
-    constructor(uint _APR){ // basis points = 5000 para 5%
-        APR_bp = _APR;
+    constructor(uint _basisPoints)ERC20("THREE", "THR"){ 
+        basisPoints = _basisPoints;
+        _mint(msg.sender, 1000000000000000000);
     }
 
-    function getBalance(address _staker) public view returns(uint) {
-        return balances[_staker].amount;
+    function stake(uint256 _numTokens) external {
+        require(balanceOf(msg.sender) >= _numTokens, "Not enough balance");
+
+        _transfer(msg.sender, address(this), _numTokens);
+
+        balances[msg.sender].stakedTokens += _numTokens;
+        balances[msg.sender].lastStakeMovement = block.timestamp;
+
+        emit Stake(msg.sender, _numTokens);
     }
 
-    function calculateStakePercentage() private view returns(uint) {
-        return APR_bp / 1000;
+    function unstake(uint256 _numTokens)external{
+        require(balances[msg.sender].stakedTokens >= _numTokens, "Insufficient staked tokens");
+        balances[msg.sender].stakedTokens -= _numTokens;
+        _transfer(address(this), msg.sender, _numTokens);
+
+        emit Unstake(msg.sender, _numTokens);
     }
 
-    function stake(address _staker, uint _amount) public {
-        require(_staker==msg.sender, "Not the owner of the staking.");
-        balances[_staker] = Staker({amount:_amount, staked_timestamp:block.timestamp});
-        emit Stake(_staker, _amount);
+    function calculateReward(address _staker)private view returns (uint256){
+        Staker storage staker = balances[_staker];
+
+        uint256 timeDiff = block.timestamp - staker.lastStakeMovement; //diferencia de tiempo en s
+        uint256 apr = calculateAPR();//apr basada en basisPoints
+        uint256 stakingReward = (staker.stakedTokens * apr * timeDiff) / (86400 * 1e18);//*
+
+        return stakingReward;
     }
 
-    function calculateTimePassed(uint _time_diff) private pure returns(uint) {
-        uint days_time = _time_diff / 86400; // 86400 seconds in a day
-        return (days_time / 30) /12;
-        
+    function calculateAPR()internal view returns(uint256){
+        return basisPoints * 1e18 / 10000; 
     }
 
-    function calculateFinalValue(address _staker, uint _years, uint _stake_percentage) private view returns(uint) {
-        // CF = C * (1+((n*r)/100))
-        return balances[_staker].amount * (1+((_years*_stake_percentage)/100));
+    function claimReward()external returns (bool){
+        uint256 reward = calculateReward(msg.sender);
+        require(reward > 0, "No rewards available");
+
+        balances[msg.sender].lastStakeMovement = block.timestamp;
+        
+        transfer(msg.sender, reward);
+        return true;
     }
-
-    function withdraw(address _staker) public returns(uint) {
-        require(_staker==msg.sender, "Not the owner of the staking.");
-        
-        uint time_diff = block.timestamp - balances[_staker].staked_timestamp;
-        uint years_time = calculateTimePassed(time_diff);
-        // time_diff/31556952
-        uint stake_percentage = calculateStakePercentage();
-        uint staking_amount = calculateFinalValue(_staker, years_time, stake_percentage);
-        
-        balances[_staker].amount = 0;
-        balances[_staker].staked_timestamp = 0;
-
-        emit Withdraw(_staker, staking_amount);
-        
-        return staking_amount;
-    }
-
-    function withdraw_test(address _staker, uint _period) public returns(uint) {
-        require(_staker==msg.sender, "Not the owner of the staking.");
-        
-        
-        uint stake_percentage = calculateStakePercentage();
-        
-        uint staking_amount = calculateFinalValue(_staker, _period, stake_percentage);
-        
-        balances[_staker].amount = 0;
-        balances[_staker].staked_timestamp = 0;
-
-        emit Withdraw(_staker, staking_amount);
-        
-        return staking_amount;
-    }
-
 }
