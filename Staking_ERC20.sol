@@ -1,12 +1,10 @@
-//https://www.youtube.com/watch?v=1IDqOXRF-Ls
-//https://www.youtube.com/watch?v=lQtf6mI1D70&t=160s
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract MyToken is ERC20 {
+contract StakingContract is ERC20, ReentrancyGuard {
 
   struct Staker {
         uint stakedTokens;
@@ -39,7 +37,7 @@ contract MyToken is ERC20 {
         emit Stake(msg.sender, _numTokens);
     }
 
-    function unstake(uint256 _numTokens)external{
+    function unstake(uint256 _numTokens) external nonReentrant {
         require(balances[msg.sender].stakedTokens >= _numTokens, "Insufficient staked tokens");
         balances[msg.sender].stakedTokens -= _numTokens;
         _transfer(address(this), msg.sender, _numTokens);
@@ -61,7 +59,7 @@ contract MyToken is ERC20 {
         return basisPoints * 1e18 / 10000; 
     }
 
-    function claimReward()external returns (bool){
+    function claimReward() external nonReentrant returns (bool){
         uint256 reward = calculateReward(msg.sender);
         require(reward > 0, "No rewards available");
         balances[msg.sender].lastStakeMovement = block.timestamp;
@@ -69,5 +67,3 @@ contract MyToken is ERC20 {
         return true;
     }
 }
-// Main: 0x7dC329c73a29c2E6606670c9F03B38976DE4E328
-// Test: 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
