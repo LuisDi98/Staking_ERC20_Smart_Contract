@@ -92,7 +92,7 @@ contract StakingContract is ERC20 {
 
     /*
     * @notice Reclama la ganancia obtenida con el staking
-    * @dev La recompensa se mintea para poder transferir tokens al usuario
+    * @dev A partir de la recompensa se crea (mint) tokens para poder transferiral usuario
     */
     function claimReward()external payable returns (bool){
         uint256 reward = calculateReward(msg.sender);
